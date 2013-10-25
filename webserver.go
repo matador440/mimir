@@ -27,7 +27,7 @@ import (
 	"strings"
 	"time"
 
-	"./websocket"
+	"github.com/visdom/mimir/websocket"
 )
 
 type WebserverInit struct {
