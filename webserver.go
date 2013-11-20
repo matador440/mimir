@@ -19,34 +19,35 @@ package main
 import (
 	"errors"
 	"fmt"
+	"io"
+	"net"
 	"net/http"
 	"os"
 	"strconv"
 	"strings"
-	"io"
 	"time"
-    "net"
-	"./websocket"
+
+	"github.com/visdom/mimir/websocket"
 )
 
 type WebserverInit struct {
-    ListenOn string
-    Root string
-    UseAuth bool
-    UseSSL bool
-    CertFile string
-    KeyFile string
+	ListenOn string
+	Root     string
+	UseAuth  bool
+	UseSSL   bool
+	CertFile string
+	KeyFile  string
 }
 
 var (
 	fileHandler http.Handler
 	flowTracker *FlowList
-    authCJ AuthCookieJar
-    checkAuth bool
+	authCJ      AuthCookieJar
+	checkAuth   bool
 )
 
 func (wi *WebserverInit) Verify() error {
-    fi, err := os.Stat(wi.Root)
+	fi, err := os.Stat(wi.Root)
 	if err != nil {
 		return err
 	}
@@ -54,62 +55,62 @@ func (wi *WebserverInit) Verify() error {
 		return errors.New(fmt.Sprintf("%s is not a directory\n", wi.Root))
 	}
 
-    if wi.UseAuth {
-        //Verify that the root directory has a directory /login in it
-        loginDir := fmt.Sprintf("%s/login/", wi.Root)
-        fi, err := os.Stat(loginDir)
-        if err != nil {
-            return errors.New(fmt.Sprintf("The root HTTP directory %s does not have a \"login\" directory for authentication", wi.Root))
-        }
-        if !fi.IsDir() {
-            return errors.New(fmt.Sprintf("The HTTP directory %s/login is not a directory", wi.Root))
-        }
+	if wi.UseAuth {
+		//Verify that the root directory has a directory /login in it
+		loginDir := fmt.Sprintf("%s/login/", wi.Root)
+		fi, err := os.Stat(loginDir)
+		if err != nil {
+			return errors.New(fmt.Sprintf("The root HTTP directory %s does not have a \"login\" directory for authentication", wi.Root))
+		}
+		if !fi.IsDir() {
+			return errors.New(fmt.Sprintf("The HTTP directory %s/login is not a directory", wi.Root))
+		}
 
-        //Verify that the *root*/login directory has login.html in it
-        loginFile := fmt.Sprintf("%s/login/login.html", wi.Root)
-        fi, err = os.Stat(loginFile)
-        if err != nil {
-            return errors.New(fmt.Sprintf("The login HTTP directory %s does not contain \"login.html\" directory for authentication", wi.Root))
-        }
-        if fi.IsDir() {
-            return errors.New(fmt.Sprintf("The login HTTP file %s/login/login.html is not a file", wi.Root))
-        }
-        checkAuth = true
-    }
+		//Verify that the *root*/login directory has login.html in it
+		loginFile := fmt.Sprintf("%s/login/login.html", wi.Root)
+		fi, err = os.Stat(loginFile)
+		if err != nil {
+			return errors.New(fmt.Sprintf("The login HTTP directory %s does not contain \"login.html\" directory for authentication", wi.Root))
+		}
+		if fi.IsDir() {
+			return errors.New(fmt.Sprintf("The login HTTP file %s/login/login.html is not a file", wi.Root))
+		}
+		checkAuth = true
+	}
 
-    //FIXME - enfoce this
-    //if wi.UseAuth == true && wi.UseSSL == false {
-    //    return errors.New("Requested authentication without SSL.  I can not let you do that Dave.")
-    //}
-    if wi.UseSSL == true {
-        if wi.CertFile == "" || wi.KeyFile == "" {
-            return errors.New("Requested SSL but KeyFile and CertFile were not set")
-        }
-        err := verifyFile(wi.CertFile)
-        if err != nil {
-            return err
-        }
-        err = verifyFile(wi.KeyFile)
-        if err != nil {
-            return err
-        }
-    } else {
-        if wi.CertFile != "" || wi.KeyFile != "" {
-            return errors.New("KeyFile or CertFile specified but UseSSL was not enabled")
-        }
-    }
-    return nil
+	//FIXME - enfoce this
+	//if wi.UseAuth == true && wi.UseSSL == false {
+	//    return errors.New("Requested authentication without SSL.  I can not let you do that Dave.")
+	//}
+	if wi.UseSSL == true {
+		if wi.CertFile == "" || wi.KeyFile == "" {
+			return errors.New("Requested SSL but KeyFile and CertFile were not set")
+		}
+		err := verifyFile(wi.CertFile)
+		if err != nil {
+			return err
+		}
+		err = verifyFile(wi.KeyFile)
+		if err != nil {
+			return err
+		}
+	} else {
+		if wi.CertFile != "" || wi.KeyFile != "" {
+			return errors.New("KeyFile or CertFile specified but UseSSL was not enabled")
+		}
+	}
+	return nil
 }
 
 func verifyFile(filepath string) error {
-    fi, err := os.Stat(filepath)
-    if err != nil {
-        return errors.New(fmt.Sprintf("%s does not exist", filepath))
-    }
-    if fi.IsDir() {
-        return errors.New(fmt.Sprintf("%s is not a file", filepath))
-    }
-    return nil
+	fi, err := os.Stat(filepath)
+	if err != nil {
+		return errors.New(fmt.Sprintf("%s does not exist", filepath))
+	}
+	if fi.IsDir() {
+		return errors.New(fmt.Sprintf("%s is not a file", filepath))
+	}
+	return nil
 }
 
 func StartWebServer(wi WebserverInit, fl *FlowList) error {
@@ -122,57 +123,57 @@ func StartWebServer(wi WebserverInit, fl *FlowList) error {
 	http.Handle("/socket", websocket.Handler(FlowWebSocket))
 	fileHandler = http.FileServer(http.Dir(wi.Root))
 	http.HandleFunc("/", Filefunc)
-    if wi.UseAuth {
-        authCJ.Init(time.Minute*30)
-	    http.HandleFunc("/go_auth/", loginFunc)
-    }
-    if wi.UseSSL {
-        go http.ListenAndServeTLS(wi.ListenOn, wi.CertFile, wi.KeyFile, nil)
-    } else {
-	    go http.ListenAndServe(wi.ListenOn, nil)
-    }
+	if wi.UseAuth {
+		authCJ.Init(time.Minute * 30)
+		http.HandleFunc("/go_auth/", loginFunc)
+	}
+	if wi.UseSSL {
+		go http.ListenAndServeTLS(wi.ListenOn, wi.CertFile, wi.KeyFile, nil)
+	} else {
+		go http.ListenAndServe(wi.ListenOn, nil)
+	}
 	return nil
 }
 
 func loginFunc(w http.ResponseWriter, r *http.Request) {
-    if r.Method != "POST" {
-        http.Error(w, "Invalid login", http.StatusServiceUnavailable)
-        return
-    }
-    user := r.FormValue("user")
-    hash := r.FormValue("hash")
-    addr, _, _ := net.SplitHostPort(r.RemoteAddr)
+	if r.Method != "POST" {
+		http.Error(w, "Invalid login", http.StatusServiceUnavailable)
+		return
+	}
+	user := r.FormValue("user")
+	hash := r.FormValue("hash")
+	addr, _, _ := net.SplitHostPort(r.RemoteAddr)
 
-    fmt.Printf("Attempt to login with creds %s %s from %s\n", user, hash, addr)
-    http.Redirect(w, r, "/", http.StatusTemporaryRedirect)
+	fmt.Printf("Attempt to login with creds %s %s from %s\n", user, hash, addr)
+	http.Redirect(w, r, "/", http.StatusTemporaryRedirect)
 }
 
 func Filefunc(w http.ResponseWriter, r *http.Request) {
-    if checkAuth && !authCJ.Verify(r) {
-        if r.RequestURI == "/" || r.RequestURI == "" || strings.HasSuffix("#", r.RequestURI) {
-            http.Redirect(w, r, "/login/login.html", http.StatusTemporaryRedirect)
-            return
-        } else if !strings.HasPrefix(r.URL.Path, "/login/") {
-            http.Error(w, "Access Denied", http.StatusUnauthorized)
-            return
-        }
-    }
+	if checkAuth && !authCJ.Verify(r) {
+		if r.RequestURI == "/" || r.RequestURI == "" || strings.HasSuffix("#", r.RequestURI) {
+			http.Redirect(w, r, "/login/login.html", http.StatusTemporaryRedirect)
+			return
+		} else if !strings.HasPrefix(r.URL.Path, "/login/") {
+			http.Error(w, "Access Denied", http.StatusUnauthorized)
+			return
+		}
+	}
 
 	if *verbose || *webDebug {
 		fmt.Printf("URL REQUEST: %v\n", r.RequestURI)
 	}
-    if r.RequestURI == "/" || r.RequestURI == "" {
-        http.Redirect(w, r, "/app/", http.StatusTemporaryRedirect)
-    } else {
-	    fileHandler.ServeHTTP(w, r)
-    }
+	if r.RequestURI == "/" || r.RequestURI == "" {
+		http.Redirect(w, r, "/app/", http.StatusTemporaryRedirect)
+	} else {
+		fileHandler.ServeHTTP(w, r)
+	}
 }
 
 func APIfunc(w http.ResponseWriter, r *http.Request) {
-    if checkAuth && !authCJ.Verify(r) {
-        http.Error(w, "Access Denied", http.StatusUnauthorized)
-        return
-    }
+	if checkAuth && !authCJ.Verify(r) {
+		http.Error(w, "Access Denied", http.StatusUnauthorized)
+		return
+	}
 	if *verbose || *webDebug {
 		fmt.Printf("URL REQUEST: %v\n", r.RequestURI)
 	}
@@ -260,7 +261,7 @@ func jsonflowsSendAll() string {
 			fmt.Fprintf(os.Stderr, "Flow ID %d gave me a bad response\n", id)
 		}
 	}
-	x+= fmt.Sprintf(" ]\n")
+	x += fmt.Sprintf(" ]\n")
 	return x
 }
 
@@ -278,16 +279,16 @@ func sendRegularFlows(ws *websocket.Conn, interval *uint32, die *bool) {
 
 // Echo the data received on the WebSocket.
 func FlowWebSocket(ws *websocket.Conn) {
-    if checkAuth && !authCJ.Verify(ws.Request()) {
-        ws.Close()
-        return
-    }
+	if checkAuth && !authCJ.Verify(ws.Request()) {
+		ws.Close()
+		return
+	}
 	die := false
 	interval := uint32(500)
 	startedRegularFlows := false
 
 	cmd, err := getCommand(ws)
-	for (cmd != "exit" && err == nil) {
+	for cmd != "exit" && err == nil {
 		if cmd == "START_FLOW_UPDATE" {
 			if !startedRegularFlows {
 				go sendRegularFlows(ws, &interval, &die)
@@ -300,7 +301,7 @@ func FlowWebSocket(ws *websocket.Conn) {
 			} else {
 				temp, err := strconv.ParseUint(bits[1], 10, 64)
 				if err != nil {
-				webSocketSendError(ws, "Invalid UPDATE_INTERVAL", strings.Join(bits[1:], " "))
+					webSocketSendError(ws, "Invalid UPDATE_INTERVAL", strings.Join(bits[1:], " "))
 				} else {
 					interval = uint32(temp)
 				}
@@ -331,7 +332,7 @@ func FlowWebSocket(ws *websocket.Conn) {
 			geoipID := bits[1]
 			args := bits[2:]
 			response := "[ "
-			for i := range(args) {
+			for i := range args {
 				lat, long, err := geoip.GetLatLong(args[i])
 				if err != nil {
 					fmt.Printf("Failed to find %s\n", args[i])
@@ -351,12 +352,12 @@ func FlowWebSocket(ws *websocket.Conn) {
 	}
 	if err != nil && err.Error() != "EOF" {
 		fmt.Printf("Got error: %v\n", err)
-	}	
+	}
 }
 
 func getCommand(ws *websocket.Conn) (string, error) {
 	var cmd []byte = make([]byte, 128)
-        n, err := ws.Read(cmd)
+	n, err := ws.Read(cmd)
 	if err != nil {
 		return "", err
 	} else if n <= 0 {
