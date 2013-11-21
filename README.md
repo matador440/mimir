@@ -23,12 +23,10 @@ apt-get install git golang libgeoip-dev libpcap-dev
 ```shell
 git clone https://github.com/visdom/visdom.git
 cd visdom
-git clone https://github.com/visdom/mimir.git
-cd mimir
-go build
+GOPATH=$PWD go get https://github.com/visdom/mimir.git
 wget http://geolite.maxmind.com/download/geoip/database/GeoLiteCity.dat.gz
 gunzip GeoLiteCity.dat.gz
-./runscripts/quickstart.sh <interface_to_sniff>
+sudo ./bin/mimir -web-enable -d eth0 -web-port 8080 -web-root ./ -maxmind-db ./GeoLiteCity.dat
 ```
 
 Browse to http://your.host.here:8080
