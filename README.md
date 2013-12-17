@@ -1,3 +1,11 @@
+# Project Status Update
+
+The project is still in development but due to current pending legal issues those changes are not being pushed to this repository as-is. Instead, we will be pushing a complete replacement to this repository. At some point in the future, anyone who has cloned this repository may find it has been replaced by a forced push and you will have to re-clone to get any updates. We might set up a temporary repository for active development which we’ll then push over the top of the official one.
+
+Details about ongoing legal issues can be found here: http://southforksecurity.com/litigation.html.
+
+Thanks to everyone for their support. Leve Visdom! Skål!
+
 # Mimir 
 Mimir is a network traffic flow analysis backend for Visdom. It is currently under heavy development and the Dev branch will be the default while master exists as a "stable" branch as much as possible during early development processes.
 
